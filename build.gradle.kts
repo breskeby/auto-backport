@@ -14,7 +14,7 @@ rewrite {
 }
 
 group = "com.breskeby.rewrite"
-description = "Automatically backport Java to Java 8 compliant"
+description = "Automatically backport Java source to older java version compliant"
 
 repositories {
     if(!project.hasProperty("releasing")) {
