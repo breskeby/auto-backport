@@ -6,15 +6,14 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.HashSet;
+import java.util.Set;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.IntStream.rangeClosed;
 
 public class MapOfBackportRecipe extends Recipe {
 
@@ -22,7 +21,7 @@ public class MapOfBackportRecipe extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Backport Maps.of() to Java 8 compliant plain java API";
+        return "Backport java.util.Map.of() to Java 8 compliant plain java API";
     }
 
     @Override
@@ -32,70 +31,71 @@ public class MapOfBackportRecipe extends Recipe {
     }
 
     public class BackportMapsOfVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private final JavaTemplate mapOfTwoParamsTemplate = JavaTemplate.builder(this::getCursor,
-                "private static <K, V> Map<K, V> mapOf(K k1, V v1) {" +
-                        "Map<K, V> map = new HashMap<K,V>();" +
-                        "map.put(k1, v1);" +
-                        "return Collections.unmodifiableMap(map)" +
-                        "}")
-                .imports("java.util.Collections")
-                .imports("java.util.HashMap").build();
-
-        private final JavaTemplate mapOfFouraramsTemplate = JavaTemplate.builder(this::getCursor,
-                "private static <K, V> Map<K, V> mapOf(K k1, V v1, K k2, V v2) {" +
-                        "Map<K, V> map = new HashMap<K,V>();" +
-                        "map.put(k1, v1);" +
-                        "map.put(k2, v2);" +
-                        "return Collections.unmodifiableMap(map)" +
-                        "}")
-                .imports("java.util.Collections")
-                .imports("java.util.HashMap").build();
-        private final JavaTemplate mapOfUsage = JavaTemplate.builder(this::getCursor, "mapOf(#{any()}, #{any()})").build();
-
-        private boolean mapOfMethodNeeded = false;
         private JavaType.FullyQualified classType;
+        private Set<Integer> usedMethodParamSizes = new HashSet<>();
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
             method = super.visitMethodInvocation(method, executionContext);
             JavaType.Method type = method.getType();
             if (type != null && MAP_OF_MATCHER.matches(method)) {
-                mapOfMethodNeeded = true;
+                int paramCount = method.getArguments().size();
+                usedMethodParamSizes.add(paramCount);
+                String code = "mapOf(" +
+                        rangeClosed(1, paramCount).mapToObj(i -> "#{any()}").collect(joining(", ")) + ")";
+                JavaTemplate mapOfUsage = JavaTemplate.builder(this::getCursor, code).build();
                 JavaType.Parameterized parameterized = (JavaType.Parameterized) method.getType().getDeclaringType();
                 JavaType.Parameterized build = JavaType.Parameterized.build(classType, parameterized.getTypeParameters());
                 JavaType.Method mapOfType = method.getType().withName("mapOf").withDeclaringType(build);
-                method = method.withTemplate(mapOfUsage, method.getCoordinates().replace(), method.getArguments().get(0), method.getArguments().get(1));
+                method = method.withTemplate(mapOfUsage, method.getCoordinates().replace(), method.getArguments().toArray());
                 return method.withType(mapOfType);
             }
             return method;
         }
 
+
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-            classType = classDecl.getType();
-            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, executionContext);
-            if (mapOfMethodNeeded) {
-                // Check if the class already has a method named "mapOf" so we don't incorrectly add a second "mapOf" method
-                boolean helloMethodAlreadyExists = classDecl.getBody().getStatements().stream()
-                        .filter(statement -> statement instanceof J.MethodDeclaration)
-                        .map(J.MethodDeclaration.class::cast)
-                        .anyMatch(methodDeclaration -> methodDeclaration.getName().getSimpleName().equals("mapOf"));
-
-                if (helloMethodAlreadyExists == false) {
-                    // Interpolate the fullyQualifiedClassName into the template and use the resulting AST to update the class body
-                    cd = cd.withBody(
-                            cd.getBody().withTemplate(
-                                    mapOfTwoParamsTemplate,
-                                    cd.getBody().getCoordinates().lastStatement()
-                            ));
-                    maybeAddImport("java.util.Map");
-                    maybeAddImport("java.util.HashMap");
-                    maybeAddImport("java.util.Collections");
-
-                }
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext executionContext) {
+            classType = cd.getType();
+            cd = super.visitClassDeclaration(cd, executionContext);
+            for (Integer usedMethodParamSize : usedMethodParamSizes) {
+                cd = maybeMapOfImplementation(cd, usedMethodParamSize);
             }
-
             return cd;
+        }
+
+        private J.ClassDeclaration maybeMapOfImplementation(J.ClassDeclaration cd, Integer usedMethodParamSize) {
+            // Check if the class already has a method named "mapOf" so we don't incorrectly add a second "mapOf" method
+            boolean helloMethodAlreadyExists = cd.getBody().getStatements().stream()
+                    .filter(statement -> statement instanceof J.MethodDeclaration)
+                    .map(J.MethodDeclaration.class::cast)
+                    .anyMatch(md -> md.getName().getSimpleName().equals("mapOf") && md.getParameters().size() == usedMethodParamSize);
+
+            if (helloMethodAlreadyExists == false) {
+                cd = cd.withBody(
+                        cd.getBody().withTemplate(
+                                mapOfTemplate(usedMethodParamSize),
+                                cd.getBody().getCoordinates().lastStatement()
+                        ));
+                maybeAddImport("java.util.HashMap");
+                maybeAddImport("java.util.Collections");
+            }
+            return cd;
+        }
+
+        private JavaTemplate mapOfTemplate(Integer paramsCount) {
+            String parameterString = rangeClosed(1, (paramsCount / 2)).mapToObj(i -> ("K k" + i + ", V v" + i))
+                    .collect(joining(", "));
+            String mapPutOperationString = rangeClosed(1, (paramsCount / 2)).mapToObj(i -> ("map.put(k" + i + ", v" + i + ");"))
+                    .collect(joining("\n"));
+            return JavaTemplate.builder(this::getCursor,
+                    "private static <K, V> Map<K, V> mapOf(" + parameterString + ") {" +
+                            "Map<K, V> map = new HashMap<K,V>();" +
+                            mapPutOperationString +
+                            "return Collections.unmodifiableMap(map)" +
+                            "}")
+                    .imports("java.util.Collections")
+                    .imports("java.util.HashMap").build();
         }
     }
 }

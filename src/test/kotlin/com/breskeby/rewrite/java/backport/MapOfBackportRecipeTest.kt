@@ -102,6 +102,46 @@ class MapsOfBackportRecipeTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun multipleMapsNestedMapOf() = assertChanged(
+            before = """
+            import java.util.Map;
+
+            class Test {
+                public void someMethod() {
+                    Map<String,Map<String,String>> ourMap = Map.of("key", Map.of("nestedKey", "nestedValue"));
+                    Map<String,Map<String,String>> anotherMap = Map.of("key1", Map.of("nestedKey1", "nestedValue1"), 
+                        "key2", Map.of("nestedKey11", "nestedValue11", "nestedKey22", "nestedValue22"));
+                }
+            }
+        """,
+            after = """
+            import java.util.Collections;
+            import java.util.HashMap;
+            import java.util.Map;
+
+            class Test {
+                public void someMethod() {
+                    Map<String,Map<String,String>> ourMap = mapOf("key", mapOf("nestedKey", "nestedValue"));
+                    Map<String,Map<String,String>> anotherMap = mapOf("key1", mapOf("nestedKey1", "nestedValue1"), "key2", mapOf("nestedKey11", "nestedValue11", "nestedKey22", "nestedValue22"));
+                }
+            
+                private static <K, V> Map<K, V> mapOf(K k1, V v1) {
+                    Map<K, V> map = new HashMap<K, V>();
+                    map.put(k1, v1);
+                    return Collections.unmodifiableMap(map);
+                }
+            
+                private static <K, V> Map<K, V> mapOf(K k1, V v1, K k2, V v2) {
+                    Map<K, V> map = new HashMap<K, V>();
+                    map.put(k1, v1);
+                    map.put(k2, v2);
+                    return Collections.unmodifiableMap(map);
+                }
+            }
+        """
+    )
+
 //    @Test
 //    fun handlesNestedMaps() = assertChanged(
 //            before = """
