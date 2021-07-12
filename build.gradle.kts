@@ -57,7 +57,7 @@ tasks.named<JavaCompile>("compileJava") {
 
     options.isFork = true
     options.forkOptions.executable = "javac"
-    options.compilerArgs.addAll(listOf("--release", "8"))
+//    options.compilerArgs.addAll(listOf("--release", "8"))
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
 }
