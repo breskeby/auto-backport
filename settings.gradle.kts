@@ -1,1 +1,1 @@
-rootProject.name = "rewrite-java-backport"
+rootProject.name = "auto-backport"
