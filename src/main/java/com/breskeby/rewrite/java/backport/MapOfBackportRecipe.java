@@ -21,12 +21,16 @@ public class MapOfBackportRecipe extends Recipe {
 
     @Override
     public String getDisplayName() {
+        return "MapOfBackportRecipe";
+    }
+
+    @Override
+    public String getDescription() {
         return "Backport java.util.Map.of() to Java 8 compliant plain java API";
     }
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        // getVisitor() should always return a new instance of the visitor to avoid any state leaking between cycles
         return new BackportMapsOfVisitor();
     }
 
@@ -99,22 +103,3 @@ public class MapOfBackportRecipe extends Recipe {
         }
     }
 }
-
-/***
- *
- *     static {
- *         ARCHITECTURES = Map.of(
- *                 "amd64", new Arch(0xC000003E, 0x3FFFFFFF, 57, 58, 59, 322, 317),
- *                 "aarch64", new Arch(0xC00000B7, 0xFFFFFFFF, 1079, 1071, 221, 281, 277));
- *     }
- *
- *     to
- *
- *
- *     static {
- *         Map<String,Arch> m = new HashMap<>();
- *         m.put("amd64", new Arch(0xC000003E, 0x3FFFFFFF, 57, 58, 59, 322, 317));
- *         m.put("aarch64",  new Arch(0xC00000B7, 0xFFFFFFFF, 1079, 1071, 221, 281, 277));
- *         ARCHITECTURES = Collections.unmodifiableMap(m);
- *     }
- */

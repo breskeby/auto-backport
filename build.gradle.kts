@@ -8,41 +8,16 @@ plugins {
     id("org.openrewrite.rewrite") version "latest.release"
 }
 
-rewrite {
-    rewriteVersion = "latest.integration"
-    activeRecipe("org.openrewrite.java.format.AutoFormat", "org.openrewrite.java.cleanup.Cleanup")
-}
-
 group = "com.breskeby.rewrite"
 description = "Automatically backport Java source to older java version compliant"
 
 repositories {
-    if(!project.hasProperty("releasing")) {
-        mavenLocal()
-        maven {
-            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-        }
-    }
     mavenCentral()
 }
 
-configurations.all {
-    resolutionStrategy {
-        cacheChangingModulesFor(0, TimeUnit.SECONDS)
-        cacheDynamicVersionsFor(0, TimeUnit.SECONDS)
-    }
-}
-
-val rewriteVersion = if(project.hasProperty("releasing")) {
-    "latest.release"
-} else {
-    "latest.integration"
-}
+val rewriteVersion = "7.8.1"
 
 dependencies {
-    compileOnly("org.projectlombok:lombok:latest.release")
-    annotationProcessor("org.projectlombok:lombok:latest.release")
-
     implementation("org.openrewrite:rewrite-java:${rewriteVersion}")
     implementation("org.openrewrite:rewrite-maven:${rewriteVersion}")
     runtimeOnly("org.openrewrite:rewrite-java-11:${rewriteVersion}")
@@ -53,24 +28,23 @@ dependencies {
 
     testImplementation("org.jetbrains.kotlin:kotlin-reflect")
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 
     testImplementation("org.openrewrite:rewrite-test:${rewriteVersion}")
-
     testImplementation("org.assertj:assertj-core:latest.release")
-
     testImplementation("com.google.guava:guava:29.0-jre")
-
     testRuntimeOnly("org.openrewrite:rewrite-java-11:${rewriteVersion}")
     testRuntimeOnly("org.openrewrite:rewrite-java-8:${rewriteVersion}")
+
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 }
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
-    jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames", "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED", "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+    jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
