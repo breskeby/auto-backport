@@ -12,10 +12,27 @@ group = "com.breskeby.rewrite"
 description = "Automatically backport Java source to older java version compliant"
 
 repositories {
+    if(!project.hasProperty("releasing")) {
+        mavenLocal()
+        maven {
+            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
+        }
+    }
     mavenCentral()
 }
 
-val rewriteVersion = "7.8.1"
+configurations.all {
+    resolutionStrategy {
+        cacheChangingModulesFor(0, TimeUnit.SECONDS)
+        cacheDynamicVersionsFor(0, TimeUnit.SECONDS)
+    }
+}
+
+val rewriteVersion = if(project.hasProperty("releasing")) {
+    "latest.release"
+} else {
+    "latest.integration"
+}
 
 dependencies {
     implementation("org.openrewrite:rewrite-java:${rewriteVersion}")
@@ -57,7 +74,7 @@ tasks.named<JavaCompile>("compileJava") {
 
     options.isFork = true
     options.forkOptions.executable = "javac"
-//    options.compilerArgs.addAll(listOf("--release", "8"))
+    options.compilerArgs.addAll(listOf("--release", "8"))
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
 }

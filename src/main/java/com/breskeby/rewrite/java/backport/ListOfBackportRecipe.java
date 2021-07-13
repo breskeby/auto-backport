@@ -15,32 +15,31 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.IntStream.rangeClosed;
 
-public class MapOfBackportRecipe extends Recipe {
+public class ListOfBackportRecipe extends Recipe {
 
-    private static final MethodMatcher MAP_OF_MATCHER = new MethodMatcher("java.util.Map of(..)");
+    private static final MethodMatcher MAP_OF_MATCHER = new MethodMatcher("java.util.List of(..)");
+    public static final String BACKPORT_LIST_OF_METHOD_NAME = "listOf";
 
     @Override
     public String getDisplayName() {
-        return "MapOfBackportRecipe";
+        return "ListOfBackportRecipe";
     }
 
     @Override
     public String getDescription() {
-        return "Backport java.util.Map.of() to Java 8 compliant plain java API";
+        return "Backport java.util.List.of() to Java 8 compliant plain java API";
     }
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new BackportMapsOfVisitor();
+        return new BackportListOfVisitor();
     }
 
-    public class BackportMapsOfVisitor extends JavaIsoVisitor<ExecutionContext> {
+    public class BackportListOfVisitor extends JavaIsoVisitor<ExecutionContext> {
         private JavaType.FullyQualified classType;
         private Map<UUID, Set<Integer>> usedMethodParamSizes = new HashMap<>();
         private UUID currentClassId;
@@ -58,14 +57,14 @@ public class MapOfBackportRecipe extends Recipe {
                     integers.add(paramCount);
                     return integers;
                 });
-                String code = "mapOf(" +
+                String code = BACKPORT_LIST_OF_METHOD_NAME + "(" +
                         rangeClosed(1, paramCount).mapToObj(i -> "#{any()}").collect(joining(", ")) + ")";
-                JavaTemplate mapOfUsage = JavaTemplate.builder(this::getCursor, code).build();
+                JavaTemplate listOfUsage = JavaTemplate.builder(this::getCursor, code).build();
                 JavaType.Parameterized parameterized = (JavaType.Parameterized) method.getType().getDeclaringType();
                 JavaType.Parameterized build = JavaType.Parameterized.build(classType, parameterized.getTypeParameters());
-                JavaType.Method mapOfType = method.getType().withName("mapOf").withDeclaringType(build);
-                method = method.withTemplate(mapOfUsage, method.getCoordinates().replace(), method.getArguments().toArray());
-                return method.withType(mapOfType);
+                JavaType.Method listOfType = method.getType().withName(BACKPORT_LIST_OF_METHOD_NAME).withDeclaringType(build);
+                method = method.withTemplate(listOfUsage, method.getCoordinates().replace(), method.getArguments().toArray());
+                return method.withType(listOfType);
             }
             return method;
         }
@@ -77,43 +76,43 @@ public class MapOfBackportRecipe extends Recipe {
             currentClassId = cd.getId();
             cd = super.visitClassDeclaration(cd, executionContext);
             for (Integer usedMethodParamSize : usedMethodParamSizes.getOrDefault(cd.getId(), Collections.emptySet())) {
-                cd = maybeMapOfImplementation(cd, usedMethodParamSize);
+                cd = maybeListOfImplementation(cd, usedMethodParamSize);
             }
             return cd;
         }
 
-        private J.ClassDeclaration maybeMapOfImplementation(J.ClassDeclaration cd, Integer usedMethodParamSize) {
-            // Check if the class already has a method named "mapOf" so we don't incorrectly add a second "mapOf" method
-            boolean helloMethodAlreadyExists = cd.getBody().getStatements().stream()
+        private J.ClassDeclaration maybeListOfImplementation(J.ClassDeclaration cd, Integer usedMethodParamSize) {
+            // Check if the class already has a method named "listOf" so we don't incorrectly add a second "listOf" method
+            boolean methodAlreadyExists = cd.getBody().getStatements().stream()
                     .filter(statement -> statement instanceof J.MethodDeclaration)
                     .map(J.MethodDeclaration.class::cast)
-                    .anyMatch(md -> md.getName().getSimpleName().equals("mapOf") && md.getParameters().size() == usedMethodParamSize);
+                    .anyMatch(md -> md.getName().getSimpleName().equals(BACKPORT_LIST_OF_METHOD_NAME) && md.getParameters().size() == usedMethodParamSize);
 
-            if (helloMethodAlreadyExists == false) {
+            if (methodAlreadyExists == false) {
                 cd = cd.withBody(
                         cd.getBody().withTemplate(
-                                mapOfTemplate(usedMethodParamSize),
+                                listOfTemplate(usedMethodParamSize),
                                 cd.getBody().getCoordinates().lastStatement()
                         ));
-                maybeAddImport("java.util.HashMap");
                 maybeAddImport("java.util.Collections");
+                maybeAddImport("java.util.ArrayList");
             }
             return cd;
         }
 
-        private JavaTemplate mapOfTemplate(Integer paramsCount) {
-            String parameterString = rangeClosed(1, (paramsCount / 2)).mapToObj(i -> ("K k" + i + ", V v" + i))
+        private JavaTemplate listOfTemplate(Integer paramsCount) {
+            String parameterString = rangeClosed(1, paramsCount).mapToObj(i -> ("E e" + i))
                     .collect(joining(", "));
-            String mapPutOperationString = rangeClosed(1, (paramsCount / 2)).mapToObj(i -> ("map.put(k" + i + ", v" + i + ");"))
+            String listOfOperationString = rangeClosed(1, paramsCount).mapToObj(i -> ("list.add(e" + i + ");"))
                     .collect(joining("\n"));
             return JavaTemplate.builder(this::getCursor,
-                    "private static <K, V> Map<K, V> mapOf(" + parameterString + ") {" +
-                            "Map<K, V> map = new HashMap<K,V>();" +
-                            mapPutOperationString +
-                            "return Collections.unmodifiableMap(map)" +
+                    "private static <E> List<E> listOf(" + parameterString + ") {" +
+                            "List<E> list = new ArrayList<E>();" +
+                            listOfOperationString +
+                            "return Collections.unmodifiableList(list)" +
                             "}")
-                    .imports("java.util.Collections")
-                    .imports("java.util.HashMap").build();
+                    .imports("java.util.ArrayList")
+                    .imports("java.util.Collections").build();
         }
     }
 }
