@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.*
 
 plugins {
     `java-library`
@@ -11,6 +10,18 @@ plugins {
 group = "com.breskeby.rewrite"
 description = "Automatically backport Java source to older java version compliant"
 
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "com.breskeby.rewrite"
+            artifactId = "java-rules"
+            version = "1.0"
+
+            from(components["java"])
+        }
+    }
+}
+
 repositories {
     if(!project.hasProperty("releasing")) {
         mavenLocal()
@@ -21,20 +32,11 @@ repositories {
     mavenCentral()
 }
 
-configurations.all {
-    resolutionStrategy {
-        cacheChangingModulesFor(0, TimeUnit.SECONDS)
-        cacheDynamicVersionsFor(0, TimeUnit.SECONDS)
-    }
-}
-
-val rewriteVersion = if(project.hasProperty("releasing")) {
-    "latest.release"
-} else {
-    "latest.integration"
-}
-
+val rewriteVersion = "7.10.0"
 dependencies {
+    compileOnly("org.projectlombok:lombok:latest.release")
+    annotationProcessor("org.projectlombok:lombok:latest.release")
+
     implementation("org.openrewrite:rewrite-java:${rewriteVersion}")
     implementation("org.openrewrite:rewrite-maven:${rewriteVersion}")
     runtimeOnly("org.openrewrite:rewrite-java-11:${rewriteVersion}")

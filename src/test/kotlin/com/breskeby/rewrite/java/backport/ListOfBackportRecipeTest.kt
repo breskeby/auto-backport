@@ -16,7 +16,7 @@ class ListOfBackportRecipeTest : JavaRecipeTest {
     fun rewritesSimpleListOf() = assertChanged(
             before = """
             import java.util.List;
-
+            import 
             class Test {
                 public void someMethod() {
                     List<String> ourList = List.of("entry1", "entry2");
