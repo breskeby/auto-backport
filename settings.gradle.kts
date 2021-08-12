@@ -1,1 +1,1 @@
-rootProject.name = "auto-backport"
+rootProject.name = "java-recipes"

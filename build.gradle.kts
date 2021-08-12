@@ -14,7 +14,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             groupId = "com.breskeby.rewrite"
-            artifactId = "java-rules"
+            artifactId = "java-recipes"
             version = "1.0"
 
             from(components["java"])
