@@ -7,28 +7,18 @@ plugins {
     id("org.openrewrite.rewrite") version "latest.release"
 }
 
-group = "com.breskeby.rewrite"
+group = group?:"com.breskeby.rewrite"
 description = "Automatically backport Java source to older java version compliant"
 
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            groupId = "com.breskeby.rewrite"
-            artifactId = "java-recipes"
-            version = "1.0"
-
             from(components["java"])
         }
     }
 }
 
 repositories {
-    if(!project.hasProperty("releasing")) {
-        mavenLocal()
-        maven {
-            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-        }
-    }
     mavenCentral()
 }
 
