@@ -21,7 +21,7 @@ publishing {
 repositories {
     mavenCentral()
 }
-
+println(System.getProperty("java.version"))
 val rewriteVersion = "7.10.0"
 dependencies {
     compileOnly("org.projectlombok:lombok:latest.release")
