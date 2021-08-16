@@ -3,25 +3,26 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     `java-library`
     `maven-publish`
+    `signing`
     id("org.jetbrains.kotlin.jvm") version "1.5.10"
     id("org.openrewrite.rewrite") version "latest.release"
+    id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
 }
 
-group = group?:"com.breskeby.rewrite"
-description = "Automatically backport Java source to older java version compliant"
+group = "com.breskeby.rewrite"
+version = "1.0.1-SNAPSHOT"
+description = "Custom java recipes to be used by the open rewrite tool"
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    withJavadocJar()
+    withSourcesJar()
 }
 
 repositories {
     mavenCentral()
 }
-println(System.getProperty("java.version"))
+
 val rewriteVersion = "7.10.0"
 dependencies {
     compileOnly("org.projectlombok:lombok:latest.release")
@@ -78,5 +79,49 @@ tasks.withType(KotlinCompile::class.java).configureEach {
 
     doFirst {
         destinationDir.mkdirs()
+    }
+}
+
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            pom {
+                name.set("java-recipes")
+                description.set(project.description)
+                inceptionYear.set("2021")
+                url.set("https://github.com/breskeby/java-recipes")
+                developers {
+                    developer {
+                        name.set("Rene Groeschke")
+                        id.set("breskeby")
+                    }
+                }
+                scm {
+                  url.set("https://github.com/breskeby/java-recipes.git")
+                }
+                licenses {
+                    license {
+                        name.set("Apache License, Version 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+signing {
+    sign(publishing.publications["maven"])
+}
+
+nexusPublishing {
+    repositories {
+        sonatype {  //only for users registered in Sonatype after 24 Feb 2021
+            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+        }
     }
 }
